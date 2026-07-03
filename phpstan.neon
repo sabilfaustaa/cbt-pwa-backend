@@ -1,0 +1,12 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app/
+
+    level: 6
+
+    ignoreErrors:
+        - '#return type with generic class Illuminate\\Database\\Eloquent\\Relations\\(BelongsTo|HasMany|BelongsToMany) does not specify its types#'
+        - '#return type with generic class Illuminate\\Database\\Eloquent\\Casts\\Attribute does not specify its types#'
