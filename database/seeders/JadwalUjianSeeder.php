@@ -12,16 +12,17 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * 5 skenario jadwal ujian — semua waktu relatif terhadap now() agar reusable.
+ * 5 skenario jadwal ujian — waktu relatif terhadap now() dan aman untuk
+ * periode testing 7 hari setelah seeder dijalankan.
  *
  * ┌────────────────────────────────────────────────────────────────────────────────┐
  * │ ID │ Kode Jadwal    │ Mata Pelajaran   │ Status      │ Waktu                  │
  * ├────────────────────────────────────────────────────────────────────────────────┤
- * │  1 │ UAS-2026-MTK   │ Matematika       │ berlangsung │ mulai -35 mnt          │
+ * │  1 │ UAS-2026-MTK   │ Matematika       │ berlangsung │ window aktif 7 hari    │
  * │  2 │ UAS-2026-TIK   │ TIK              │ selesai     │ 2 minggu lalu          │
  * │  3 │ UAS-BATAL-001  │ (TIK, 5 soal)   │ dibatalkan  │ kemarin                │
- * │  4 │ UAS-2026-BIND  │ Bahasa Indonesia │ terbuka     │ hari ini +4 jam        │
- * │  5 │ UAS-DRAFT-001  │ (TIK, 10 soal)  │ draft       │ +7 hari                │
+ * │  4 │ UAS-2026-BIND  │ Bahasa Indonesia │ terbuka     │ setelah periode uji    │
+ * │  5 │ UAS-DRAFT-001  │ (TIK, 10 soal)  │ draft       │ setelah periode uji    │
  * └────────────────────────────────────────────────────────────────────────────────┘
  *
  * Urutan pembuatan: MTK dulu (ID 1, sesi ID 1-30) sehingga:
@@ -34,8 +35,15 @@ use Illuminate\Database\Seeder;
  */
 class JadwalUjianSeeder extends Seeder
 {
+    private const TESTING_WINDOW_DAYS = 7;
+
     public function run(): void
     {
+        $seededAt = now();
+        $testingWindowEndsAt = $seededAt->copy()->addDays(self::TESTING_WINDOW_DAYS)->endOfDay();
+        $lockedExamStartsAt = $seededAt->copy()->addDays(self::TESTING_WINDOW_DAYS + 1)->setTime(8, 0, 0);
+        $draftStartsAt = $seededAt->copy()->addDays(self::TESTING_WINDOW_DAYS + 2)->setTime(8, 0, 0);
+
         $adminId = User::where('email', 'admin@cbt.test')->value('id');
 
         $allPeserta = User::whereHas('role', fn ($q) => $q->where('nama_role', RoleName::Peserta))
@@ -44,15 +52,15 @@ class JadwalUjianSeeder extends Seeder
 
         $first10Peserta = $allPeserta->take(10);
 
-        // ── 1. Berlangsung: ujian SEDANG BERJALAN (mulai 35 menit lalu) ──────
+        // ── 1. Berlangsung: window jadwal aktif sepanjang periode testing ────
         // ID 1 — sesi IDs 1–30 (A001 sesi = ID 1), JadwalPeserta IDs 1–30
         JadwalUjian::create([
             'kode_jadwal'     => 'UAS-2026-MTK',
             'nama_ujian'      => 'UAS Genap — Matematika Dasar',
             'deskripsi'       => 'Ujian Akhir Semester Genap 2025/2026 mata pelajaran Matematika. '
-                . 'Saat ini sedang berlangsung — sisa waktu sekitar 55 menit.',
-            'waktu_mulai'     => now()->subMinutes(35),
-            'waktu_selesai'   => now()->addMinutes(55),
+                . 'Window jadwal aktif selama periode testing; durasi sesi peserta tetap 90 menit.',
+            'waktu_mulai'     => $seededAt->copy()->subMinutes(35),
+            'waktu_selesai'   => $testingWindowEndsAt->copy(),
             'durasi_menit'    => 90,
             'acak_soal'       => true,
             'acak_opsi'       => false,
@@ -71,8 +79,8 @@ class JadwalUjianSeeder extends Seeder
             'nama_ujian'      => 'UAS Genap — Teknologi Informasi & Komunikasi',
             'deskripsi'       => 'Ujian Akhir Semester Genap 2025/2026 mata pelajaran TIK. '
                 . 'Telah selesai. Hasil, rekap, dan analitik tersedia untuk semua pihak.',
-            'waktu_mulai'     => now()->subWeeks(2)->setTime(7, 30, 0),
-            'waktu_selesai'   => now()->subWeeks(2)->setTime(9, 30, 0),
+            'waktu_mulai'     => $seededAt->copy()->subWeeks(2)->setTime(7, 30, 0),
+            'waktu_selesai'   => $seededAt->copy()->subWeeks(2)->setTime(9, 30, 0),
             'durasi_menit'    => 90,
             'acak_soal'       => true,
             'acak_opsi'       => true,
@@ -91,8 +99,8 @@ class JadwalUjianSeeder extends Seeder
             'nama_ujian'      => 'UAS Genap — Seni Budaya (DIBATALKAN)',
             'deskripsi'       => 'Jadwal dibatalkan karena force majeure. '
                 . 'Semua sesi peserta berstatus dibatalkan.',
-            'waktu_mulai'     => now()->subDay()->setTime(10, 0, 0),
-            'waktu_selesai'   => now()->subDay()->setTime(11, 30, 0),
+            'waktu_mulai'     => $seededAt->copy()->subDay()->setTime(10, 0, 0),
+            'waktu_selesai'   => $seededAt->copy()->subDay()->setTime(11, 30, 0),
             'durasi_menit'    => 90,
             'acak_soal'       => false,
             'acak_opsi'       => false,
@@ -105,14 +113,14 @@ class JadwalUjianSeeder extends Seeder
         $this->attachSoal($jadwalBatal->id, array_slice(SoalSeeder::$tikIds, 0, 5));
         $this->assignPeserta($jadwalBatal->id, $first10Peserta);
 
-        // ── 4. Terbuka: ujian HARI INI jam sore, peserta sudah assign ────────
+        // ── 4. Terbuka: terkunci setelah periode uji untuk early-start test ──
         $jadwalMendatang = JadwalUjian::create([
             'kode_jadwal'     => 'UAS-2026-BIND',
             'nama_ujian'      => 'UAS Genap — Bahasa Indonesia',
             'deskripsi'       => 'Ujian Akhir Semester Genap 2025/2026 mata pelajaran Bahasa Indonesia. '
-                . 'Semua peserta sudah memiliki token akses. Ujian dimulai hari ini.',
-            'waktu_mulai'     => now()->addHours(4)->startOfHour(),
-            'waktu_selesai'   => now()->addHours(5)->startOfHour(),
+                . 'Semua peserta sudah memiliki token akses, tetapi window ujian sengaja belum dimulai.',
+            'waktu_mulai'     => $lockedExamStartsAt->copy(),
+            'waktu_selesai'   => $lockedExamStartsAt->copy()->addHour(),
             'durasi_menit'    => 60,
             'acak_soal'       => false,
             'acak_opsi'       => false,
@@ -130,8 +138,8 @@ class JadwalUjianSeeder extends Seeder
             'nama_ujian'      => 'UAS Genap — Simulasi Draft (Belum Dipublikasikan)',
             'deskripsi'       => 'Jadwal dalam tahap persiapan. Soal sudah dilampirkan, peserta belum di-assign. '
                 . 'Status masih draft, transisi ke terbuka bisa dilakukan admin.',
-            'waktu_mulai'     => now()->addDays(7)->setTime(8, 0, 0),
-            'waktu_selesai'   => now()->addDays(7)->setTime(9, 30, 0),
+            'waktu_mulai'     => $draftStartsAt->copy(),
+            'waktu_selesai'   => $draftStartsAt->copy()->addMinutes(90),
             'durasi_menit'    => 90,
             'acak_soal'       => false,
             'acak_opsi'       => false,

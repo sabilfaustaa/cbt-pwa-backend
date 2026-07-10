@@ -37,7 +37,7 @@ use Illuminate\Support\Facades\DB;
  * ║  suite test & metrik paritas.                                                  ║
  * ╠══════════════════════════════════════════════════════════════════════════════╣
  * ║  PETA KONDISI (semua waktu relatif now(); peserta A001–A010 dari UserSeeder)   ║
- * ║  ── Jadwal KONDISI-BUKA (terbuka, window aktif: -10 mnt … +120 mnt) ────────   ║
+ * ║  ── Jadwal KONDISI-BUKA (terbuka, window aktif selama 7 hari uji) ──────────   ║
  * ║   A001  K1  belum_mulai      → kontrol positif: boleh mulai sekarang           ║
  * ║   A002  K2  sedang_berlangsung, sisa ±40 detik → uji timer habis LIVE          ║
  * ║   A003  K3  sedang_berlangsung, OVERTIME (batas -3 mnt), ADA jawaban           ║
@@ -51,17 +51,20 @@ use Illuminate\Support\Facades\DB;
  * ║   A007  K7  dibatalkan pengawas                                                ║
  * ║   A008  K8  sedang_berlangsung normal (progress 4 soal) → baseline             ║
  * ║   A009  K9  selesai, tampilkan_hasil=FALSE → uji gating hasil (403 peserta)    ║
- * ║  ── Jadwal KONDISI-NANTI (terbuka, window belum buka: mulai +3 jam) ────────   ║
+ * ║  ── Jadwal KONDISI-NANTI (terbuka, belum buka sampai periode uji selesai) ──   ║
  * ║   A010  K10 belum_mulai → uji "masuk lebih awal": mulai=409, tapi cek F-02     ║
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  */
 class KondisiUjianSeeder extends Seeder
 {
+    private const TESTING_WINDOW_DAYS = 7;
+
     private ScoringService $scoringService;
 
     public function run(): void
     {
         $this->scoringService = app(ScoringService::class);
+        $seededAt = now();
 
         $adminId = User::where('email', 'admin@cbt.test')->value('id');
         if (! $adminId) {
@@ -91,15 +94,18 @@ class KondisiUjianSeeder extends Seeder
             return;
         }
 
-        DB::transaction(function () use ($adminId, $peserta, $soal) {
+        DB::transaction(function () use ($adminId, $peserta, $soal, $seededAt) {
             $this->bersihkanKondisiLama();
+
+            $testingWindowEndsAt = $seededAt->copy()->addDays(self::TESTING_WINDOW_DAYS)->endOfDay();
+            $lockedExamStartsAt = $seededAt->copy()->addDays(self::TESTING_WINDOW_DAYS + 1)->setTime(8, 0, 0);
 
             $jadwalBuka = $this->buatJadwal($adminId, [
                 'kode_jadwal' => 'KONDISI-BUKA',
                 'nama_ujian' => 'AUDIT — Kondisi Alur Ujian (Window Aktif)',
-                'deskripsi' => 'Jadwal audit finalisasi. Window aktif: -10 mnt … +120 mnt.',
-                'waktu_mulai' => now()->subMinutes(10),
-                'waktu_selesai' => now()->addMinutes(120),
+                'deskripsi' => 'Jadwal audit finalisasi. Window aktif selama periode testing 7 hari.',
+                'waktu_mulai' => $seededAt->copy()->subMinutes(10),
+                'waktu_selesai' => $testingWindowEndsAt,
                 'durasi_menit' => 60,
                 'passing_grade' => 65,
                 'tampilkan_hasil' => true,
@@ -109,9 +115,9 @@ class KondisiUjianSeeder extends Seeder
             $jadwalNanti = $this->buatJadwal($adminId, [
                 'kode_jadwal' => 'KONDISI-NANTI',
                 'nama_ujian' => 'AUDIT — Ujian Belum Dibuka (Mulai +3 Jam)',
-                'deskripsi' => 'Jadwal audit finalisasi. Window belum buka (mulai +3 jam).',
-                'waktu_mulai' => now()->addHours(3),
-                'waktu_selesai' => now()->addHours(4),
+                'deskripsi' => 'Jadwal audit finalisasi. Window belum buka sampai periode testing selesai.',
+                'waktu_mulai' => $lockedExamStartsAt->copy(),
+                'waktu_selesai' => $lockedExamStartsAt->copy()->addHour(),
                 'durasi_menit' => 60,
                 'passing_grade' => 75,
                 'tampilkan_hasil' => true,

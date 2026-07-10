@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
  * ║  Studi Kasus: UAS Genap 2025/2026 · SMK Negeri 1 Cibinong · X-TKJ-1        ║
  * ╠══════════════════════════════════════════════════════════════════════════════╣
  * ║  Jalankan:  php artisan migrate:fresh --seed                                 ║
- * ║  Semua waktu RELATIF terhadap now() — reusable di hari manapun.              ║
+ * ║  Semua waktu RELATIF terhadap now() — reusable dan aman untuk 7 hari uji.    ║
  * ╠══════════════════════════════════════════════════════════════════════════════╣
  * ║  AKUN LOGIN                                                                  ║
  * ║  Admin      : admin@cbt.test          / password                            ║
@@ -24,9 +24,9 @@ use Illuminate\Support\Facades\Schema;
  * ╠══════════════════════════════════════════════════════════════════════════════╣
  * ║  SKENARIO JADWAL (5 jadwal)                                                  ║
  * ║  ─────────────────────────────────────────────────────────────────────────  ║
- * ║  UAS-DRAFT-001  — draft        (+7 hari, soal ada, peserta belum)            ║
- * ║  UAS-2026-BIND  — terbuka      (hari ini +4 jam, 30 peserta belum mulai)     ║
- * ║  UAS-2026-MTK   — berlangsung  (mulai -35 mnt, selesai +55 mnt)             ║
+ * ║  UAS-DRAFT-001  — draft        (setelah periode uji, soal ada, peserta belum)║
+ * ║  UAS-2026-BIND  — terbuka      (setelah periode uji, 30 peserta belum mulai) ║
+ * ║  UAS-2026-MTK   — berlangsung  (window jadwal aktif 7 hari)                 ║
  * ║    ├─ A001–A005 : sedang_berlangsung – normal (8/14 soal dijawab)            ║
  * ║    ├─ A006–A007 : sedang_berlangsung – hampir habis (waktu_batas +3 mnt)     ║
  * ║    ├─ A008–A009 : sedang_berlangsung – OVERTIME (waktu_batas -5 mnt)         ║
